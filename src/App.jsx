@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef, createContext, useContext } from "react";
+import React, { useState, useMemo, useRef, useEffect, createContext, useContext } from "react";
+import { supabase } from "./supabaseClient";
 
 /* ============================================================
    SPARROW SCHOOL — interactive mahjong tutorial (prototype v4)
@@ -1751,13 +1752,24 @@ function Landing({ onStart, teacher }) {
 
 /* ---------------- ACCOUNT / AUTH (prototype) ---------------- */
 
-function Account({ account, onSignIn, onSignOut, onBack, stars, completed }) {
+function Account({ account, onSendLink, onSignOut, onBack, stars, completed, cloudOn }) {
   const T = useT();
-  const providers = [
-    { id: "apple", label: "Continue with Apple", bg: "#000", fg: "#fff", mark: "" },
-    { id: "google", label: "Continue with Google", bg: "#fff", fg: "#3A3A40", mark: "G" },
-    { id: "email", label: "Email me a magic link", bg: T.primary, fg: "#fff", mark: "✉" },
-  ];
+  const [email, setEmail] = useState("");
+  const [emailMode, setEmailMode] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const send = async () => {
+    setErr("");
+    if (!/^\S+@\S+\.\S+$/.test(email)) { setErr("Please enter a valid email."); return; }
+    setBusy(true);
+    const ok = await onSendLink(email);
+    setBusy(false);
+    if (ok === true) setSent(true);
+    else setErr(typeof ok === "string" ? ok : "Couldn't send the link — try again.");
+  };
+
   return (
     <div style={{ padding: "0 18px 36px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 0 10px" }}>
@@ -1769,7 +1781,7 @@ function Account({ account, onSignIn, onSignOut, onBack, stars, completed }) {
         <>
           <div style={{ textAlign: "center", padding: "20px 0 8px" }}>
             <div style={{ width: 78, height: 78, borderRadius: "50%", margin: "0 auto 12px", background: T.successSoft, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 34 }}>✓</div>
-            <div style={{ fontWeight: 800, fontSize: 19, color: T.ink, fontFamily: T.fontDisplay }}>{account.label}</div>
+            <div style={{ fontWeight: 800, fontSize: 19, color: T.ink, fontFamily: T.fontDisplay, wordBreak: "break-all" }}>{account.label}</div>
             <div style={{ fontSize: 14, color: T.sub, marginTop: 3 }}>Signed in with {account.provider} · progress synced</div>
           </div>
           <div style={{ display: "flex", gap: 11, margin: "18px 0 22px" }}>
@@ -1784,36 +1796,64 @@ function Account({ account, onSignIn, onSignOut, onBack, stars, completed }) {
           </div>
           <button onClick={onSignOut} style={{ width: "100%", minHeight: 52, fontWeight: 800, fontSize: 16, fontFamily: T.fontBody, color: T.danger, background: T.card, border: `1.5px solid ${T.cardBorder}`, borderRadius: 16, boxShadow: T.cardShadow, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}>Sign out</button>
         </>
+      ) : sent ? (
+        <div style={{ textAlign: "center", padding: "36px 14px" }}>
+          <div style={{ fontSize: 46 }}>✉️</div>
+          <h3 style={{ fontFamily: T.fontDisplay, fontSize: 21, fontWeight: 800, color: T.ink, margin: "12px 0 8px" }}>Check your email</h3>
+          <p style={{ fontSize: 15, color: T.sub, lineHeight: 1.55, margin: "0 auto", maxWidth: 320 }}>
+            We sent a sign-in link to <b style={{ color: T.ink }}>{email}</b>. Tap it on this device to finish — your progress comes with you. (Check spam if you don't see it.)
+          </p>
+        </div>
       ) : (
         <>
           <div style={{ textAlign: "center", padding: "18px 10px 6px" }}>
             <div style={{ fontSize: 40 }}>☁︎</div>
             <h3 style={{ fontFamily: T.fontDisplay, fontSize: 20, fontWeight: 800, color: T.ink, margin: "8px 0 6px" }}>Keep your progress safe</h3>
             <p style={{ fontSize: 14.5, color: T.sub, lineHeight: 1.55, margin: "0 auto", maxWidth: 320 }}>
-              You're learning as a guest — everything's saved on this device. Sign in to sync your stars and streak across your phone, tablet, and laptop.
+              You're learning as a guest — everything's saved {cloudOn ? "to this device for now" : "on this device"}. Sign in to sync your stars and streak across your phone, tablet, and laptop.
             </p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 11, marginTop: 22 }}>
-            {providers.map((p) => (
-              <button key={p.id} onClick={() => onSignIn(p)}
-                className="ss-btn"
+            {/* Apple & Google — enable in Supabase, then wire (see notes) */}
+            {[
+              { id: "apple", label: "Continue with Apple", bg: "#000", fg: "#fff", mark: "" },
+              { id: "google", label: "Continue with Google", bg: "#fff", fg: "#3A3A40", mark: "G" },
+            ].map((p) => (
+              <button key={p.id} disabled
                 style={{
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 10, position: "relative",
                   width: "100%", minHeight: 56, fontSize: 16.5, fontWeight: 800, fontFamily: T.fontBody,
-                  color: p.fg, background: p.bg,
+                  color: p.fg, background: p.bg, opacity: .55,
                   border: p.id === "google" ? `1.5px solid ${T.cardBorder}` : "none",
-                  borderRadius: 16, cursor: "pointer",
-                  boxShadow: T.btnEdge ? "0 4px 0 rgba(0,0,0,.16)" : "0 2px 10px rgba(0,0,0,.12)",
-                  WebkitTapHighlightColor: "transparent",
+                  borderRadius: 16, cursor: "default", WebkitTapHighlightColor: "transparent",
                 }}>
                 {p.mark && <span style={{ fontWeight: 800, fontSize: 18 }}>{p.mark}</span>}
                 {p.label}
+                <span style={{ position: "absolute", right: 12, fontSize: 10.5, fontWeight: 800, background: "rgba(255,255,255,.25)", color: "inherit", borderRadius: 999, padding: "3px 8px", textTransform: "uppercase", letterSpacing: ".04em" }}>soon</span>
               </button>
             ))}
+
+            {!emailMode ? (
+              <button onClick={() => setEmailMode(true)} className="ss-btn"
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", minHeight: 56, fontSize: 16.5, fontWeight: 800, fontFamily: T.fontBody, color: "#fff", background: T.primary, border: "none", borderRadius: 16, cursor: "pointer", boxShadow: T.btnEdge ? `0 4px 0 ${T.primaryDeep}` : "0 2px 10px rgba(0,0,0,.12)", WebkitTapHighlightColor: "transparent" }}>
+                <span style={{ fontSize: 18 }}>✉</span> Email me a sign-in link
+              </button>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <input
+                  type="email" inputMode="email" autoCapitalize="off" autoCorrect="off"
+                  value={email} onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@email.com"
+                  style={{ width: "100%", minHeight: 54, padding: "0 16px", fontSize: 16.5, fontFamily: T.fontBody, color: T.ink, background: T.card, border: `1.5px solid ${err ? T.danger : T.cardBorder}`, borderRadius: 14, outline: "none", WebkitTapHighlightColor: "transparent" }}
+                />
+                <Btn onClick={send} disabled={busy}>{busy ? "Sending…" : "Send link"}</Btn>
+                {err && <p style={{ fontSize: 13.5, color: T.danger, fontWeight: 700, textAlign: "center", margin: 0 }}>{err}</p>}
+              </div>
+            )}
           </div>
           <p style={{ fontSize: 12, color: T.sub, textAlign: "center", marginTop: 18, lineHeight: 1.5 }}>
-            No passwords, ever. We'll never post anything or share your info.<br />
-            <span style={{ opacity: .8 }}>Prototype — production wires these to Supabase Auth.</span>
+            No passwords, ever. We'll never post anything or share your info.
+            {!cloudOn && <><br /><span style={{ opacity: .8 }}>Cloud sync isn't configured yet — running in local mode.</span></>}
           </p>
         </>
       )}
@@ -1952,17 +1992,105 @@ export default function SparrowSchool() {
   const [completed, setCompleted] = useState([]);
   const [themeId, setThemeId] = useState("duo");
   const [teacherId, setTeacherId] = useState("mai");
-  const [account, setAccount] = useState(null);
+  const [user, setUser] = useState(null);
+  const [booting, setBooting] = useState(!!supabase);
   const [showNudge, setShowNudge] = useState(false);
   const [nudged, setNudged] = useState(false);
+  const hydrated = useRef(false);
 
   const T = THEMES[themeId];
   const teacher = TEACHERS.find((t) => t.id === teacherId);
+  const cloudOn = !!supabase;
 
-  const signIn = (p) => {
-    setAccount({ provider: p.id === "apple" ? "Apple" : p.id === "google" ? "Google" : "email", label: p.id === "email" ? "you@email.com" : "Sparrow learner" });
-    setShowNudge(false);
-    setScreen("home");
+  // a "real" account = signed in and not anonymous
+  const account =
+    user && !user.is_anonymous && user.email
+      ? { provider: user.app_metadata?.provider === "google" ? "Google" : user.app_metadata?.provider === "apple" ? "Apple" : "email", label: user.email }
+      : null;
+
+  // ---- boot: sign in (anonymously if needed), then load progress ----
+  useEffect(() => {
+    if (!supabase) return; // local-only mode: app still works, just no sync
+    let unsub;
+    (async () => {
+      try {
+        let { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          await supabase.auth.signInAnonymously();
+          ({ data: { session } } = await supabase.auth.getSession());
+        }
+        const u = session?.user ?? null;
+        setUser(u);
+        if (u) {
+          const { data } = await supabase
+            .from("progress").select("*").eq("user_id", u.id).maybeSingle();
+          if (data) {
+            setStars(data.stars || 0);
+            setCompleted(Array.isArray(data.completed) ? data.completed : []);
+          }
+        }
+      } catch (e) {
+        // network/config issue — fall back to local-only, never white-screen
+        console.warn("Supabase boot failed, running locally:", e?.message);
+      } finally {
+        hydrated.current = true;
+        setBooting(false);
+      }
+    })();
+
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    unsub = data?.subscription;
+    return () => unsub?.unsubscribe();
+  }, []);
+
+  // ---- save progress (debounced) whenever it changes, once hydrated ----
+  useEffect(() => {
+    if (!supabase || !user || !hydrated.current) return;
+    const t = setTimeout(() => {
+      supabase.from("progress").upsert({
+        user_id: user.id,
+        stars,
+        completed,
+        updated_at: new Date().toISOString(),
+      }).then(({ error }) => { if (error) console.warn("save failed:", error.message); });
+    }, 600);
+    return () => clearTimeout(t);
+  }, [stars, completed, user]);
+
+  // ---- send magic link to upgrade the current guest to a real account ----
+  const sendMagicLink = async (email) => {
+    if (!supabase) {
+      // local-only fallback so the UI still demonstrates the flow
+      setUser({ id: "local", is_anonymous: false, email });
+      return true;
+    }
+    try {
+      // updateUser on an anonymous user links the email & keeps their progress
+      const { error } = await supabase.auth.updateUser({ email });
+      if (error) {
+        // fallback: standard OTP/magic-link sign-in (also works for returning users)
+        const { error: e2 } = await supabase.auth.signInWithOtp({
+          email,
+          options: { emailRedirectTo: window.location.origin },
+        });
+        if (e2) return e2.message;
+      }
+      return true;
+    } catch (e) {
+      return e?.message || "Something went wrong.";
+    }
+  };
+
+  const signOut = async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+      await supabase.auth.signInAnonymously(); // keep playing as a fresh guest
+    } else {
+      setUser(null);
+    }
+    setScreen("profile");
   };
 
   const finishLesson = () => {
@@ -2028,6 +2156,14 @@ export default function SparrowSchool() {
           @keyframes ssflicker { 0%,18%,22%,25%,53%,57%,100% { opacity: 1; } 20%,24%,55% { opacity: .55; } }
         `}</style>
 
+        {booting ? (
+          <div className="ss-app" style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "70vh" }}>
+            <div style={{ textAlign: "center" }}>
+              <div className="ss-bob"><teacher.Comp size={92} /></div>
+              <div style={{ marginTop: 14, fontFamily: T.fontDisplay, fontWeight: 800, fontSize: 16, color: T.sub }}>Shuffling tiles…</div>
+            </div>
+          </div>
+        ) : (
         <div className={`ss-app ${screen === "landing" ? "ss-fullbleed" : ""}`}>
           <div className="ss-app-body">
             {screen === "landing" && (
@@ -2053,8 +2189,8 @@ export default function SparrowSchool() {
                 account={account} onAccount={() => setScreen("account")} onBack={() => setScreen("profile")} />
             )}
             {screen === "account" && (
-              <Account account={account} stars={stars} completed={completed}
-                onSignIn={signIn} onSignOut={() => setAccount(null)} onBack={() => setScreen("profile")} />
+              <Account account={account} stars={stars} completed={completed} cloudOn={cloudOn}
+                onSendLink={sendMagicLink} onSignOut={signOut} onBack={() => setScreen("profile")} />
             )}
             {screen === "lesson" && (
               <Lesson key={`${activeLesson}`} lessonId={activeLesson} teacher={teacher}
@@ -2069,6 +2205,7 @@ export default function SparrowSchool() {
             <BottomNav active={screen} onNav={(id) => setScreen(id)} />
           )}
         </div>
+        )}
         {showNudge && (
           <SaveNudge onSignIn={() => { setShowNudge(false); setScreen("account"); }} onLater={() => setShowNudge(false)} />
         )}
