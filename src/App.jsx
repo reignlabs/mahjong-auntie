@@ -2863,6 +2863,16 @@ function Sim({ teacher, onExit }) {
     return () => clearTimeout(timer.current);
   }, [g?.phase, g?.cur]);
 
+  // tips: mark the most-isolated (suggested discard) tile.
+  // NOTE: must run on every render (before any early return) to satisfy Rules of Hooks.
+  const suggestKey = useMemo(() => {
+    if (!g || !tips || g.phase !== "myturn") return null;
+    const c = simCounts(g.hands[0]);
+    let worst = null, ws = Infinity;
+    for (const k of [...new Set(g.hands[0])]) { const u = simUseful(k, c); if (u < ws) { ws = u; worst = k; } }
+    return worst;
+  }, [tips, g]);
+
   if (!g) return null;
 
   const myHand = simSort(g.hands[0]);
@@ -2912,15 +2922,6 @@ function Sim({ teacher, onExit }) {
     const next = (from + 1) % 4;
     setG({ ...g, offer: null, cur: next, phase: next === 0 ? "predraw" : "botthinking", msg: next === 0 ? "Your turn." : `${SEAT_INFO[next].name} is thinking…` });
   };
-
-  // tips: mark the most-isolated (suggested discard) tile
-  const suggestKey = useMemo(() => {
-    if (!tips || g.phase !== "myturn") return null;
-    const c = simCounts(g.hands[0]);
-    let worst = null, ws = Infinity;
-    for (const k of [...new Set(g.hands[0])]) { const u = simUseful(k, c); if (u < ws) { ws = u; worst = k; } }
-    return worst;
-  }, [tips, g]);
 
   const over = g.over;
 
