@@ -99,62 +99,118 @@ function clack() {
 
 /* ---------------- TEACHER AVATARS ---------------- */
 
-function AuntieAvatar({ size = 76 }) {
-  // Mahjong Auntie — cute cartoon Asian auntie: glasses, permed hair,
-  // jade twin-set, gold jewelry + a luxe (IP-safe) quilted handbag on her arm.
+function AuntieAvatar({ size = 76, animate = true }) {
+  // Mahjong Auntie — cute cartoon Asian auntie: gold glasses, permed hair,
+  // jade twin-set, pearls + a luxe (IP-safe) quilted bag hanging from her arm.
   return (
-    <svg viewBox="0 0 100 100" width={size} height={size} className="ss-bob" style={{ display: "block" }}>
+    <svg viewBox="0 0 100 104" width={size} height={size * 1.04} className={animate ? "ss-bob" : ""} style={{ display: "block", overflow: "visible" }}>
+      {/* ---- BODY (drawn first, behind head) ---- */}
+      {/* left arm + hand resting, right arm bent holding the bag */}
+      <path d="M30 86 q-9 -10 -4 -22" fill="none" stroke="#2FA877" strokeWidth="9" strokeLinecap="round" />
+      <g className={animate ? "ss-armbag" : ""} style={{ transformOrigin: "70px 66px" }}>
+        {/* right upper arm bent at elbow, forearm comes forward — the bag hangs in the crook */}
+        <path d="M70 64 q10 4 11 15 q-1 9 -9 12" fill="none" stroke="#2FA877" strokeWidth="9" strokeLinecap="round" />
+        {/* hand */}
+        <circle cx="71" cy="91" r="5" fill="#F2C9A0" />
+        {/* bag strap loops over the forearm, bag hangs below the elbow */}
+        <g transform="translate(79 83)">
+          <path d="M-9 -2 q0 -9 9 -9 q9 0 9 9" fill="none" stroke="#E7B53C" strokeWidth="1.8" />
+          <rect x="-11" y="-2" width="22" height="17" rx="5" fill="#C0392B" stroke="#8E2A20" strokeWidth="1.5" />
+          <path d="M-11 6 l22 0 M0 -2 l0 17 M-6 -2 l12 17 M6 -2 l-12 17" stroke="#A02E22" strokeWidth=".9" opacity=".65" />
+          <rect x="-2" y="4" width="4.5" height="4" rx="1" fill="#FFD978" stroke="#D5A22B" strokeWidth=".6" />
+        </g>
+      </g>
       {/* shoulders / jade twin-set */}
-      <path d="M22 92 q0 -22 28 -22 q28 0 28 22 Z" fill="#2FA877" />
-      <path d="M22 92 q0 -22 28 -22 q28 0 28 22 Z" fill="none" stroke="#1F8C60" strokeWidth="1.5" />
-      {/* pink scarf / collar accent */}
-      <path d="M40 71 q10 9 20 0 l-3 7 q-7 5 -14 0 Z" fill="#FF7FA8" />
-      {/* gold pearl necklace */}
-      <path d="M40 73 q10 8 20 0" fill="none" stroke="#E7B53C" strokeWidth="2.4" strokeLinecap="round" />
-      {[44, 48, 52, 56].map((x, i) => <circle key={i} cx={x} cy={75 + (i === 1 || i === 2 ? 1.5 : 0)} r="1.6" fill="#FFD978" stroke="#D5A22B" strokeWidth=".5" />)}
+      <path d="M24 100 q0 -26 26 -26 q26 0 26 26 Z" fill="#2FA877" />
+      <path d="M24 100 q0 -26 26 -26 q26 0 26 26 Z" fill="none" stroke="#1F8C60" strokeWidth="1.5" />
+      {/* pink scarf knot at collar */}
+      <path d="M40 75 q10 9 20 0 l-4 9 q-6 4 -12 0 Z" fill="#FF7FA8" />
+      {/* pearl necklace */}
+      <path d="M41 77 q9 8 18 0" fill="none" stroke="#E7B53C" strokeWidth="2.2" strokeLinecap="round" />
+      <circle cx="44" cy="79.5" r="1.5" fill="#FFF3D0" stroke="#D5A22B" strokeWidth=".5" />
+      <circle cx="48" cy="81" r="1.5" fill="#FFF3D0" stroke="#D5A22B" strokeWidth=".5" />
+      <circle cx="52" cy="81" r="1.5" fill="#FFF3D0" stroke="#D5A22B" strokeWidth=".5" />
+      <circle cx="56" cy="79.5" r="1.5" fill="#FFF3D0" stroke="#D5A22B" strokeWidth=".5" />
 
-      {/* hair back (permed bob) */}
-      <path d="M24 40 q-4 -30 26 -32 q30 2 26 32 q3 14 -6 18 q2 -12 -4 -16 q-16 8 -32 0 q-6 4 -4 16 q-9 -4 -2 -18 Z" fill="#2E2A33" />
+      {/* ---- HEAD ---- */}
+      {/* hair back (rounded permed bob) */}
+      <path d="M26 42 q-3 -32 24 -34 q27 2 24 34 q2 12 -5 17 q1 -11 -3 -16 q-16 7 -32 0 q-4 5 -3 16 q-7 -5 -5 -17 Z" fill="#2E2A33" />
       {/* face */}
-      <circle cx="50" cy="40" r="22" fill="#F2C9A0" />
-      {/* permed fringe curls */}
-      <path d="M31 25 q5 -6 10 -3 q5 -5 9 -2 q5 -3 9 -1 q6 -2 9 3 q-13 -5 -20 -1 q-11 -3 -17 4 Z" fill="#2E2A33" />
-      <circle cx="30" cy="32" r="4" fill="#2E2A33" />
-      <circle cx="70" cy="32" r="4" fill="#2E2A33" />
+      <ellipse cx="50" cy="42" rx="21" ry="22" fill="#F4CDA4" />
+      {/* ears + hoop earrings */}
+      <circle cx="29.5" cy="46" r="3.2" fill="#F4CDA4" />
+      <circle cx="70.5" cy="46" r="3.2" fill="#F4CDA4" />
+      <circle cx="29" cy="50" r="3" fill="none" stroke="#E7B53C" strokeWidth="2" />
+      <circle cx="71" cy="50" r="3" fill="none" stroke="#E7B53C" strokeWidth="2" />
+      {/* soft permed fringe (rounded scallops, lighter) */}
+      <path d="M32 29 q4 -7 10 -4 q4 -6 8 -2 q4 -4 8 -1 q5 -2 8 3 q-5 -1 -8 1 q-4 -4 -8 -1 q-4 -3 -8 0 q-5 -1 -10 4 Z" fill="#2E2A33" />
+      <path d="M32 29 q3 5 8 5 M68 29 q-3 5 -8 5" fill="none" stroke="#2E2A33" strokeWidth="2.6" strokeLinecap="round" />
       {/* blush */}
-      <ellipse cx="34" cy="45" rx="5" ry="3.2" fill="#FF9DBA" opacity=".75" />
-      <ellipse cx="66" cy="45" rx="5" ry="3.2" fill="#FF9DBA" opacity=".75" />
-      {/* glasses (stylish, gold rim) */}
-      <g stroke="#D8A82E" strokeWidth="2.2" fill="rgba(255,255,255,.18)">
-        <rect x="33" y="34" width="14" height="11" rx="4" />
-        <rect x="53" y="34" width="14" height="11" rx="4" />
+      <ellipse cx="35" cy="48" rx="4.6" ry="3" fill="#FF9DBA" opacity=".7" />
+      <ellipse cx="65" cy="48" rx="4.6" ry="3" fill="#FF9DBA" opacity=".7" />
+      {/* eyes (with blink) */}
+      <g className={animate ? "ss-blink" : ""} style={{ transformOrigin: "50px 42px" }}>
+        <circle cx="41" cy="42" r="3" fill="#33303A" />
+        <circle cx="59" cy="42" r="3" fill="#33303A" />
+        <circle cx="42.2" cy="40.8" r="1" fill="#fff" />
+        <circle cx="60.2" cy="40.8" r="1" fill="#fff" />
       </g>
-      <path d="M47 39 q3 -1.5 6 0" stroke="#D8A82E" strokeWidth="2.2" fill="none" strokeLinecap="round" />
-      <path d="M33 37 l-6 -2 M67 37 l6 -2" stroke="#D8A82E" strokeWidth="2.2" strokeLinecap="round" />
-      {/* eyes (behind glasses, big & friendly) */}
-      <circle cx="40" cy="40" r="2.8" fill="#33303A" />
-      <circle cx="60" cy="40" r="2.8" fill="#33303A" />
-      <circle cx="41" cy="39" r="1" fill="#fff" />
-      <circle cx="61" cy="39" r="1" fill="#fff" />
-      {/* warm smile */}
-      <path d="M43 50 q7 6 14 0" stroke="#C25C70" strokeWidth="2.4" fill="none" strokeLinecap="round" />
-      {/* gold hoop earrings */}
-      <circle cx="27.5" cy="46" r="3" fill="none" stroke="#E7B53C" strokeWidth="2" />
-      <circle cx="72.5" cy="46" r="3" fill="none" stroke="#E7B53C" strokeWidth="2" />
-
-      {/* luxe quilted handbag on her arm (IP-safe: generic quilting + gold chain, no house marks) */}
-      <path d="M70 72 q8 -3 9 4" fill="none" stroke="#2FA877" strokeWidth="6" strokeLinecap="round" />
-      <g transform="translate(70 70)">
-        <path d="M-3 -7 q3 -5 12 -5 q9 0 12 5" fill="none" stroke="#E7B53C" strokeWidth="1.6" />
-        <rect x="-9" y="-6" width="22" height="17" rx="4" fill="#C0392B" stroke="#8E2A20" strokeWidth="1.4" />
-        {/* quilting */}
-        <path d="M-9 0 l22 0 M2 -6 l0 17 M-4 -6 l12 17 M8 -6 l-12 17" stroke="#A02E22" strokeWidth=".8" opacity=".7" />
-        {/* gold clasp */}
-        <rect x="-1.5" y="-1.5" width="5" height="4" rx="1" fill="#FFD978" stroke="#D5A22B" strokeWidth=".6" />
+      {/* gold cat-eye glasses (over eyes) */}
+      <g stroke="#D8A82E" strokeWidth="2.2" fill="rgba(255,255,255,.14)">
+        <path d="M33 38 h13 q1 4 -1 7 q-12 2 -12 -3 q0 -3 0 -4 Z" />
+        <path d="M67 38 h-13 q-1 4 1 7 q12 2 12 -3 q0 -3 0 -4 Z" />
       </g>
+      <path d="M46 39 q4 -1.5 8 0" stroke="#D8A82E" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <path d="M33 38 l-4 -1 M67 38 l4 -1" stroke="#D8A82E" strokeWidth="2" strokeLinecap="round" />
+      {/* nose + warm smile */}
+      <path d="M49 47 q1 2 2 3" stroke="#D8A57E" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+      <path d="M42 53 q8 7 16 0" stroke="#C25C70" strokeWidth="2.6" fill="none" strokeLinecap="round" />
+      {/* beauty mark — auntie signature */}
+      <circle cx="62" cy="56" r="1" fill="#7A5A48" />
     </svg>
   );
 }
+
+const AUNTIE_SAYINGS = [
+  "Aiyah, you discard THAT?",
+  "Have you eaten yet?",
+  "Sit up straight, lah.",
+  "I let you win… this time.",
+  "When you getting married?",
+  "Wah, big hand — pay up!",
+  "Your cousin already knows how.",
+  "Eat first, play after.",
+  "Drink more water, ah.",
+  "Slowly slowly, no rush.",
+  "Pung! …okay, your turn.",
+  "So close! Try again, dear.",
+  "Don't be shy, take the last one.",
+  "This auntie taught you, remember.",
+];
+
+function AuntieSpeech({ interval = 3600, style }) {
+  const T = useT();
+  const [i, setI] = useState(() => Math.floor(Math.random() * AUNTIE_SAYINGS.length));
+  const [show, setShow] = useState(true);
+  useEffect(() => {
+    const t = setInterval(() => {
+      setShow(false);
+      setTimeout(() => { setI((p) => (p + 1) % AUNTIE_SAYINGS.length); setShow(true); }, 280);
+    }, interval);
+    return () => clearInterval(t);
+  }, [interval]);
+  return (
+    <div style={{ position: "relative", display: "inline-block", ...style }}>
+      <div className={show ? "ss-bubblein" : "ss-bubbleout"}
+        style={{ position: "relative", background: "#fff", color: "#2A2533", fontWeight: 800, fontSize: 14, fontFamily: T.fontBody, padding: "10px 15px", borderRadius: 16, boxShadow: "0 6px 18px rgba(0,0,0,.18)", whiteSpace: "nowrap", border: "2px solid #FFE08A" }}>
+        {AUNTIE_SAYINGS[i]}
+        <span style={{ position: "absolute", left: 22, bottom: -8, width: 0, height: 0, borderLeft: "8px solid transparent", borderRight: "8px solid transparent", borderTop: "9px solid #fff" }} />
+        <span style={{ position: "absolute", left: 21, bottom: -11, width: 0, height: 0, borderLeft: "9px solid transparent", borderRight: "9px solid transparent", borderTop: "10px solid #FFE08A", zIndex: -1 }} />
+      </div>
+    </div>
+  );
+}
+
 
 function SparrowAvatar({ size = 76 }) {
   return (
@@ -2271,7 +2327,10 @@ function Landing({ onStart, teacher, returning, completedCount }) {
 
         {/* mascot + CTA */}
         <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 24px 0", gap: 16 }}>
-          <div className="ss-hero-mascot" style={{ filter: "drop-shadow(0 8px 24px rgba(255,77,141,.35))" }}><A size={104} /></div>
+          <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <AuntieSpeech style={{ marginBottom: 14, zIndex: 2 }} />
+            <div className="ss-hero-mascot" style={{ filter: "drop-shadow(0 8px 24px rgba(255,77,141,.35))" }}><A size={108} /></div>
+          </div>
           {returning && (
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.22)", borderRadius: 999, padding: "7px 15px", color: "#fff", fontWeight: 800, fontSize: 13.5, backdropFilter: "blur(8px)" }}>
               👋 Welcome back · {completedCount} lesson{completedCount === 1 ? "" : "s"} done
@@ -3578,6 +3637,14 @@ export default function SparrowSchool() {
           @keyframes ssfall { to { transform: translateY(110vh) rotate(540deg); } }
           @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
           @keyframes ssflicker { 0%,18%,22%,25%,53%,57%,100% { opacity: 1; } 20%,24%,55% { opacity: .55; } }
+          .ss-blink { animation: ssblink 5.5s ease-in-out infinite; }
+          @keyframes ssblink { 0%,92%,100% { transform: scaleY(1); } 96% { transform: scaleY(.1); } }
+          .ss-armbag { animation: ssarmbag 4.2s ease-in-out infinite; }
+          @keyframes ssarmbag { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-5deg); } }
+          .ss-bubblein { animation: ssbubblein .34s cubic-bezier(.34,1.56,.64,1) both; }
+          .ss-bubbleout { animation: ssbubbleout .26s ease both; }
+          @keyframes ssbubblein { 0% { opacity: 0; transform: translateY(6px) scale(.85); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+          @keyframes ssbubbleout { to { opacity: 0; transform: translateY(-4px) scale(.92); } }
         `}</style>
 
         {booting ? (
