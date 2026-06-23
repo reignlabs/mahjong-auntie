@@ -97,6 +97,53 @@ function clack() {
   } catch (e) { /* garnish, never a blocker */ }
 }
 
+/* ---------------- SOUND ENGINE (synth, mutable, persisted) ---------------- */
+const SOUND = (() => {
+  let muted = false;
+  try { muted = localStorage.getItem("ma.muted") === "1"; } catch (e) {}
+  let ambient = null;
+  const ac = () => { try { _actx = _actx || new (window.AudioContext || window.webkitAudioContext)(); return _actx; } catch (e) { return null; } };
+
+  function tone({ freq = 600, dur = 0.06, type = "triangle", gain = 0.07, slideTo = null }) {
+    if (muted) return;
+    const c = ac(); if (!c) return;
+    try {
+      const t = c.currentTime, o = c.createOscillator(), g = c.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, t);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+      g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+      o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
+    } catch (e) {}
+  }
+  // a tile click = two quick knocks, slightly randomized (ivory-on-felt feel)
+  function tileClack(vol = 0.09) {
+    const f = 360 + Math.random() * 120;
+    tone({ freq: f, slideTo: f * 0.5, dur: 0.045, gain: vol, type: "triangle" });
+    setTimeout(() => tone({ freq: f * 0.8, slideTo: f * 0.4, dur: 0.04, gain: vol * 0.7, type: "triangle" }), 18);
+  }
+  function discard() { tileClack(0.11); }
+  function claim() { tone({ freq: 520, slideTo: 880, dur: 0.12, gain: 0.09, type: "square" }); setTimeout(() => tileClack(0.1), 60); }
+  function win() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone({ freq: f, dur: 0.16, gain: 0.08, type: "triangle" }), i * 90)); }
+  function lose() { [392, 330, 262].forEach((f, i) => setTimeout(() => tone({ freq: f, dur: 0.18, gain: 0.06, type: "sine" }), i * 130)); }
+
+  // parlor ambience: sparse randomized distant clacks + faint murmur
+  function startAmbience() {
+    if (muted || ambient) return;
+    const c = ac(); if (!c) return;
+    const tick = () => {
+      // 1–3 faint clacks in a little flurry
+      const n = 1 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < n; i++) setTimeout(() => tone({ freq: 280 + Math.random() * 180, slideTo: 150, dur: 0.05, gain: 0.025 + Math.random() * 0.02, type: "triangle" }), i * (40 + Math.random() * 60));
+      ambient = setTimeout(tick, 700 + Math.random() * 1400);
+    };
+    ambient = setTimeout(tick, 400);
+  }
+  function stopAmbience() { if (ambient) { clearTimeout(ambient); ambient = null; } }
+  function setMuted(m) { muted = m; try { localStorage.setItem("ma.muted", m ? "1" : "0"); } catch (e) {} if (m) stopAmbience(); }
+  return { tileClack, discard, claim, win, lose, startAmbience, stopAmbience, setMuted, isMuted: () => muted };
+})();
+
+
 /* ---------------- TEACHER AVATARS ---------------- */
 
 function AuntieAvatar({ size = 76, animate = true }) {
@@ -2157,6 +2204,32 @@ function Complete({ stars, lessonId, teacher, onHome, onSim }) {
   );
 }
 
+function ToggleRow({ icon, title, desc, storeKey, defaultOn = true, inverted = false, onChange }) {
+  const T = useT();
+  // for inverted keys (e.g. "muted"), storeKey===1 means OFF
+  const read = () => {
+    try { const v = localStorage.getItem(storeKey); if (v === null) return defaultOn; return inverted ? v !== "1" : v === "1"; } catch (e) { return defaultOn; }
+  };
+  const [on, setOn] = useState(read);
+  const toggle = () => {
+    const next = !on; setOn(next);
+    try { localStorage.setItem(storeKey, inverted ? (next ? "0" : "1") : (next ? "1" : "0")); } catch (e) {}
+    onChange && onChange(next);
+  };
+  return (
+    <CardBox onClick={toggle} style={{ display: "flex", alignItems: "center", gap: 13, padding: "13px 15px", minHeight: 66 }}>
+      <span style={{ fontSize: 19, width: 28, textAlign: "center" }}>{icon}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 800, fontSize: 15.5, color: T.ink, fontFamily: T.fontDisplay }}>{title}</div>
+        <div style={{ fontSize: 12.5, color: T.sub, marginTop: 1 }}>{desc}</div>
+      </div>
+      <div style={{ width: 46, height: 27, borderRadius: 999, background: on ? T.primary : T.barTrack, position: "relative", transition: "background .2s", flexShrink: 0 }}>
+        <span style={{ position: "absolute", top: 3, left: on ? 22 : 3, width: 21, height: 21, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,.3)", transition: "left .2s" }} />
+      </div>
+    </CardBox>
+  );
+}
+
 function Settings({ themeId, setThemeId, teacherId, setTeacherId, account, onAccount, onBack }) {
   const T = useT();
   return (
@@ -2182,7 +2255,15 @@ function Settings({ themeId, setThemeId, teacherId, setTeacherId, account, onAcc
         <span style={{ color: T.sub, fontSize: 20, fontWeight: 800 }}>›</span>
       </CardBox>
 
-      <h3 style={{ fontSize: 13.5, fontWeight: 800, color: T.sub, textTransform: "uppercase", letterSpacing: ".07em", margin: "18px 0 10px" }}>Theme</h3>
+      <h3 style={{ fontSize: 13.5, fontWeight: 800, color: T.sub, textTransform: "uppercase", letterSpacing: ".07em", margin: "18px 0 10px" }}>Game</h3>
+      <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
+        <ToggleRow icon="🔊" title="Sound & parlor ambience" desc="Tile clacks and background table sounds"
+          storeKey="ma.muted" inverted defaultOn onChange={(on) => SOUND.setMuted(!on)} />
+        <ToggleRow icon="💡" title="In-game tips" desc="Rotating reminders during the simulation"
+          storeKey="ma.simTips" defaultOn />
+      </div>
+
+
       <div style={{ display: "flex", flexDirection: "column", gap: 11 }}>
         {Object.values(THEMES).map((th) => (
           <CardBox key={th.id} onClick={() => setThemeId(th.id)} selected={themeId === th.id}
@@ -2748,6 +2829,43 @@ const SEAT_INFO = [
   { name: "Grandma", wind: "北", tag: "" },         // left
 ];
 
+// per-seat flavor lines (index matches SEAT_INFO). [1]=Auntie [2]=Uncle [3]=Grandma
+const BOT_LINES = {
+  1: { // Auntie
+    discard: ["Aiyah, take this lah.", "I don't need this one.", "You want? Too bad.", "So-so hand only."],
+    claim: ["Pung! Thank you ah.", "Mm-hm, I take that.", "Auntie needs it more."],
+    win: ["Sik wu! Pay up, dear.", "Told you I had it.", "Easy money, aiyah."],
+    youPung: ["Wah, so fast you.", "Okay okay, smart."],
+  },
+  2: { // Uncle
+    discard: ["In my day, real money.", "Bah, useless tile.", "You sure about your hand?", "Hmph. Next."],
+    claim: ["Pung! Ha, mine.", "Too slow, young one.", "I saw that coming."],
+    win: ["Sik wu! Beginner's luck, no.", "I was playing before you born.", "Count my fan, ah."],
+    youPung: ["Lucky grab only.", "Don't get cocky."],
+  },
+  3: { // Grandma
+    discard: ["Slowly slowly, dear.", "Here, you take.", "Aiya, not this one.", "Have you eaten?"],
+    claim: ["Pung, dear. So sorry.", "Grandma takes this.", "Oh, lucky me."],
+    win: ["Sik wu! I let you try.", "My grandson plays nice too.", "Good game, sweetie."],
+    youPung: ["Clever child.", "Just like your mother."],
+  },
+};
+const botLine = (seat, kind) => { const s = BOT_LINES[seat]?.[kind]; return s ? s[Math.floor(Math.random() * s.length)] : null; };
+
+// rotating, non-intrusive in-game tips (glossary + strategy)
+const SIM_TIPS = [
+  "碰 Pung = three identical tiles. Claim from anyone.",
+  "上 Chow = a run of 3 in one suit — only from the player on your left.",
+  "食糊 (sik wu) = the winning call: 4 sets + a pair.",
+  "The pair is the “eyes” 眼 (ngaan). Every hand needs exactly one.",
+  "番 fan = points. Most tables need 3 fan to win.",
+  "自摸 (zi mo) = self-draw. Worth more — everyone pays.",
+  "Discard tip: lone honors with no pair are usually safe to throw.",
+  "Watch the pond — a tile already discarded is safer to repeat.",
+  "出銃 = you discard the tile someone wins on. Then you alone pay.",
+  "Dragons 🀄 and your seat wind score fan — try to keep them paired.",
+];
+
 function TileBackRow({ n, horizontal }) {
   const T = useT();
   return (
@@ -2762,17 +2880,24 @@ function TileBackRow({ n, horizontal }) {
   );
 }
 
-function OpponentPanel({ seat, count, lastDiscard, active, side }) {
+function OpponentPanel({ seat, count, lastDiscard, active, side, say, thinking }) {
   const T = useT();
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, opacity: active ? 1 : 0.92 }}>
+    <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 5, opacity: active ? 1 : 0.92 }}>
+      {say && (
+        <div className="ss-bubblein" style={{ position: "absolute", top: -34, zIndex: 5, background: "#fff", color: "#2A2533", fontWeight: 800, fontSize: 11.5, padding: "6px 10px", borderRadius: 12, boxShadow: "0 5px 14px rgba(0,0,0,.22)", border: "1.5px solid #FFE08A", whiteSpace: "nowrap", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis" }}>
+          {say}
+          <span style={{ position: "absolute", left: "50%", marginLeft: -6, bottom: -7, width: 0, height: 0, borderLeft: "6px solid transparent", borderRight: "6px solid transparent", borderTop: "7px solid #fff" }} />
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <div className={active ? "ss-beat" : ""} style={{ width: 30, height: 30, borderRadius: "50%", background: active ? T.primary : T.card, border: `2px solid ${active ? T.primary : T.cardBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: active ? "#fff" : T.sub, fontFamily: "'Noto Sans TC',sans-serif" }}>{seat.wind}</div>
+        <div className={active ? "ss-pulsering" : ""} style={{ "--pc": T.primary + "66", width: 30, height: 30, borderRadius: "50%", background: active ? T.primary : T.card, border: `2px solid ${active ? T.primary : T.cardBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: active ? "#fff" : T.sub, fontFamily: "'Noto Sans TC',sans-serif" }}>{seat.wind}</div>
         <div style={{ fontSize: 12.5, fontWeight: 800, color: T.ink }}>{seat.name}</div>
+        {thinking && <span style={{ display: "inline-flex", gap: 2, marginLeft: 1 }}>{[0, 1, 2].map((i) => <span key={i} className="ss-think" style={{ width: 4, height: 4, borderRadius: "50%", background: T.primary, animation: "ssthink 1s ease-in-out infinite", animationDelay: `${i * 0.15}s` }} />)}</span>}
       </div>
       <TileBackRow n={count} horizontal={side === "left" || side === "right"} />
       <div style={{ minHeight: 30 }}>
-        {lastDiscard && <div style={{ transform: "scale(.8)" }}><MiniTile t={simFromKey(lastDiscard)} size={32} /></div>}
+        {lastDiscard && <div className="ss-land2" style={{ transform: "scale(.8)" }}><MiniTile t={simFromKey(lastDiscard)} size={32} /></div>}
       </div>
     </div>
   );
@@ -2781,17 +2906,38 @@ function OpponentPanel({ seat, count, lastDiscard, active, side }) {
 function Sim({ teacher, onExit }) {
   const T = useT();
   const [g, setG] = useState(null);
-  const [tips, setTips] = useState(true);
+  const [tips, setTips] = useState(true);                    // tips highlight (suggested discard)
+  const [hintsOn, setHintsOn] = useState(() => { try { return localStorage.getItem("ma.simTips") !== "0"; } catch (e) { return true; } }); // rotating glossary chip
+  const [muted, setMuted] = useState(() => SOUND.isMuted());
   const [coach, setCoach] = useState(() => !lsLoad()?.simSeen);
+  const [bot, setBot] = useState(null);                      // {seat, text} transient bot bubble
+  const [flash, setFlash] = useState(null);                  // {text, color} big call banner
+  const [tipI, setTipI] = useState(() => Math.floor(Math.random() * SIM_TIPS.length));
+  const [tipShow, setTipShow] = useState(true);
   const timer = useRef(null);
+  const botTimer = useRef(null);
+  const flashTimer = useRef(null);
+
+  const sayBot = (seat, kind) => {
+    const line = botLine(seat, kind);
+    if (!line) return;
+    setBot({ seat, text: line });
+    clearTimeout(botTimer.current);
+    botTimer.current = setTimeout(() => setBot(null), 2400);
+  };
+  const doFlash = (text, color) => {
+    setFlash({ text, color });
+    clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlash(null), 1000);
+  };
 
   // ---- init ----
   const start = () => {
     const wall = simWall();
     const hands = [[], [], [], []];
     for (let i = 0; i < 13; i++) for (let p = 0; p < 4; p++) hands[p].push(wall.pop());
-    // dealer (you) draws to 14, you discard first
     hands[0].push(wall.pop());
+    setBot(null); setFlash(null);
     setG({
       wall, hands, melds: [[], [], [], []], pond: [],
       last: [null, null, null, null],
@@ -2800,11 +2946,30 @@ function Sim({ teacher, onExit }) {
       offer: null, over: null,
     });
   };
-  useEffect(() => { start(); return () => clearTimeout(timer.current); }, []);
+  useEffect(() => {
+    start();
+    return () => { clearTimeout(timer.current); clearTimeout(botTimer.current); clearTimeout(flashTimer.current); SOUND.stopAmbience(); };
+  }, []);
+
+  // start parlor ambience once the coach is dismissed (needs a user gesture first)
+  useEffect(() => { if (!coach && !muted) SOUND.startAmbience(); }, [coach, muted]);
+
+  // rotate the glossary tip chip, fading seamlessly
+  useEffect(() => {
+    if (!hintsOn) return;
+    const id = setInterval(() => {
+      setTipShow(false);
+      setTimeout(() => { setTipI((p) => (p + 1) % SIM_TIPS.length); setTipShow(true); }, 450);
+    }, 6500);
+    return () => clearInterval(id);
+  }, [hintsOn]);
+
+  const toggleMute = () => { const m = !muted; setMuted(m); SOUND.setMuted(m); if (!m) SOUND.startAmbience(); };
+  const toggleHints = () => { const v = !hintsOn; setHintsOn(v); try { localStorage.setItem("ma.simTips", v ? "1" : "0"); } catch (e) {} };
 
   // ---- helpers ----
-  const youWin = (g, fromSelf, fromSeat) => ({ ...g, phase: "over", over: { winner: 0, self: fromSelf, from: fromSeat }, msg: fromSelf ? "自摸! You self-drew the win!" : "食糊! You won off the discard!" });
-  const botWins = (g, p, fromSelf, fromSeat) => ({ ...g, phase: "over", over: { winner: p, self: fromSelf, from: fromSeat }, msg: `${SEAT_INFO[p].name} wins${fromSelf ? " (self-draw)" : ""}.` });
+  const youWin = (g, fromSelf, fromSeat) => { SOUND.win(); doFlash(fromSelf ? "自摸!" : "食糊!", T.star); return { ...g, phase: "over", over: { winner: 0, self: fromSelf, from: fromSeat }, msg: fromSelf ? "自摸! You self-drew the win!" : "食糊! You won off the discard!" }; };
+  const botWins = (g, p, fromSelf, fromSeat) => { SOUND.lose(); doFlash("食糊!", "#C0392B"); sayBot(p, "win"); return { ...g, phase: "over", over: { winner: p, self: fromSelf, from: fromSeat }, msg: `${SEAT_INFO[p].name} wins${fromSelf ? " (self-draw)" : ""}.` }; };
 
   // advance to a given player's draw (bot or you)
   const goDraw = (gg, p) => {
@@ -2814,14 +2979,14 @@ function Sim({ teacher, onExit }) {
     const hands = gg.hands.map((h) => [...h]);
     hands[p].push(drawn);
     if (p === 0) {
-      // your draw — can you self-win?
       const selfWin = simIsWin(hands[0], gg.melds[0].length);
       setG({ ...gg, wall, hands, cur: 0, phase: "myturn", wallLeft: wall.length, drawn, msg: selfWin ? "You can declare 自摸!" : "You drew a tile — tap one to discard.", offer: selfWin ? { win: true } : null });
     } else {
-      // bot draw
       if (simIsWin(hands[p], gg.melds[p].length)) { setG(botWins({ ...gg, wall, hands }, p, true)); return; }
       const disc = simBotDiscard(hands[p]);
       hands[p].splice(hands[p].indexOf(disc), 1);
+      SOUND.discard();
+      if (Math.random() < 0.4) sayBot(p, "discard");
       afterDiscard({ ...gg, wall, hands }, p, disc);
     }
   };
@@ -2881,7 +3046,7 @@ function Sim({ teacher, onExit }) {
   // your discard
   const discard = (tk, idx) => {
     if (g.phase !== "myturn") return;
-    clack();
+    SOUND.discard();
     const hands = g.hands.map((h) => [...h]);
     // remove one instance by key
     const pos = hands[0].indexOf(tk);
@@ -2895,20 +3060,19 @@ function Sim({ teacher, onExit }) {
     else if (g.phase === "myturn" && g.offer?.win) setG(youWin(g, true));
   };
   const doPung = () => {
-    const tile = g.offer.tile;
+    const tile = g.offer.tile, from = g.offer.from;
+    SOUND.claim(); doFlash("碰!", T.primary); sayBot(from, "youPung");
     const hands = g.hands.map((h) => [...h]);
-    // remove two from your hand, form meld with the discard
     let removed = 0;
     hands[0] = hands[0].filter((k) => { if (k === tile && removed < 2) { removed++; return false; } return true; });
     const melds = g.melds.map((m) => [...m]);
     melds[0] = [...melds[0], { type: "pung", tiles: [tile, tile, tile] }];
-    // pond keeps the claimed tile shown; you now discard
     setG({ ...g, hands, melds, phase: "myturn", offer: null, cur: 0, msg: "碰! Pung taken — now discard." });
   };
   const doChow = () => {
     const tile = g.offer.tile, s = tile[0], n = +tile.slice(1);
+    SOUND.claim(); doFlash("上!", T.primary);
     const hands = g.hands.map((h) => [...h]);
-    // find a valid pair of tiles to complete the run
     const combos = [[-2,-1],[-1,1],[1,2]];
     let used = null;
     for (const [a,b] of combos) { const ka=s+(n+a), kb=s+(n+b); if (hands[0].includes(ka)&&hands[0].includes(kb)){ used=[ka,kb]; break; } }
@@ -2928,31 +3092,47 @@ function Sim({ teacher, onExit }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", minHeight: "min(100dvh,840px)", padding: "12px 14px calc(14px + env(safe-area-inset-bottom,0px))" }}>
       {/* top bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
         <button onClick={onExit} aria-label="Exit game" style={{ background: T.card, border: `1.5px solid ${T.cardBorder}`, borderRadius: 12, width: 40, height: 40, fontSize: 16, color: T.sub, cursor: "pointer", boxShadow: T.chipShadow }}>✕</button>
-        <div style={{ flex: 1, fontFamily: T.fontDisplay, fontWeight: 800, fontSize: 16, color: T.ink }}>Practice Table <span style={{ color: T.sub, fontWeight: 700, fontSize: 13 }}>· wall {g.wallLeft ?? g.wall.length}</span></div>
-        <button onClick={() => setTips((v) => !v)} style={{ background: tips ? T.primary : T.card, color: tips ? "#fff" : T.sub, border: `1.5px solid ${tips ? T.primary : T.cardBorder}`, borderRadius: 999, padding: "7px 13px", fontWeight: 800, fontSize: 12.5, cursor: "pointer", boxShadow: T.chipShadow }}>Tips {tips ? "on" : "off"}</button>
+        <div style={{ flex: 1, fontFamily: T.fontDisplay, fontWeight: 800, fontSize: 15.5, color: T.ink }}>Practice Table <span style={{ color: T.sub, fontWeight: 700, fontSize: 12.5 }}>· wall {g.wallLeft ?? g.wall.length}</span></div>
+        <button onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"} style={{ background: T.card, border: `1.5px solid ${T.cardBorder}`, borderRadius: 999, width: 38, height: 38, fontSize: 16, color: T.sub, cursor: "pointer", boxShadow: T.chipShadow }}>{muted ? "🔇" : "🔊"}</button>
+        <button onClick={() => setTips((v) => !v)} style={{ background: tips ? T.primary : T.card, color: tips ? "#fff" : T.sub, border: `1.5px solid ${tips ? T.primary : T.cardBorder}`, borderRadius: 999, padding: "7px 12px", fontWeight: 800, fontSize: 12, cursor: "pointer", boxShadow: T.chipShadow }}>Hints {tips ? "on" : "off"}</button>
       </div>
 
       {/* table */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", background: "radial-gradient(120% 90% at 50% 45%, #1F7A55 0%, #16603F 70%, #124E34 100%)", borderRadius: 22, padding: "12px 10px", position: "relative", boxShadow: "inset 0 2px 14px rgba(0,0,0,.25)" }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", background: "radial-gradient(120% 90% at 50% 45%, #1F7A55 0%, #16603F 70%, #124E34 100%)", borderRadius: 22, padding: "12px 10px", position: "relative", boxShadow: "inset 0 2px 14px rgba(0,0,0,.25)", overflow: "hidden" }}>
+        {/* big call flash */}
+        {flash && (
+          <div className="ss-flash" style={{ position: "absolute", inset: 0, zIndex: 8, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+            <div style={{ fontFamily: "'Noto Sans TC',sans-serif", fontWeight: 800, fontSize: 72, color: flash.color, textShadow: "0 4px 18px rgba(0,0,0,.5), 0 0 2px #fff", WebkitTextStroke: "2px #fff" }}>{flash.text}</div>
+          </div>
+        )}
         {/* top opponent */}
         <div style={{ display: "flex", justifyContent: "center" }}>
-          <OpponentPanel seat={SEAT_INFO[2]} count={g.hands[2].length} lastDiscard={g.last[2]} active={g.cur === 2} side="top" />
+          <OpponentPanel seat={SEAT_INFO[2]} count={g.hands[2].length} lastDiscard={g.last[2]} active={g.cur === 2} side="top" say={bot?.seat === 2 ? bot.text : null} thinking={g.cur === 2 && g.phase === "botthinking"} />
         </div>
         {/* middle: left opp · pond · right opp */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, padding: "4px 0" }}>
-          <OpponentPanel seat={SEAT_INFO[3]} count={g.hands[3].length} lastDiscard={g.last[3]} active={g.cur === 3} side="left" />
+          <OpponentPanel seat={SEAT_INFO[3]} count={g.hands[3].length} lastDiscard={g.last[3]} active={g.cur === 3} side="left" say={bot?.seat === 3 ? bot.text : null} thinking={g.cur === 3 && g.phase === "botthinking"} />
           <div style={{ flex: 1, alignSelf: "stretch", display: "flex", flexWrap: "wrap", alignContent: "center", justifyContent: "center", gap: 3, minHeight: 86, maxWidth: 230, margin: "0 auto" }}>
-            {g.pond.slice(-15).map((d, i) => (
-              <div key={i} style={{ transform: "scale(.62)", margin: -4 }}><MiniTile t={simFromKey(d.t)} size={34} /></div>
+            {g.pond.slice(-15).map((d, i, arr) => (
+              <div key={g.pond.length - arr.length + i} className={i === arr.length - 1 ? "ss-land2" : ""} style={{ transform: "scale(.62)", margin: -4 }}><MiniTile t={simFromKey(d.t)} size={34} /></div>
             ))}
           </div>
-          <OpponentPanel seat={SEAT_INFO[1]} count={g.hands[1].length} lastDiscard={g.last[1]} active={g.cur === 1} side="right" />
+          <OpponentPanel seat={SEAT_INFO[1]} count={g.hands[1].length} lastDiscard={g.last[1]} active={g.cur === 1} side="right" say={bot?.seat === 1 ? bot.text : null} thinking={g.cur === 1 && g.phase === "botthinking"} />
         </div>
         {/* message */}
         <div style={{ textAlign: "center", color: "#EAFBF1", fontWeight: 800, fontSize: 14.5, minHeight: 22, fontFamily: T.fontDisplay, textShadow: "0 1px 3px rgba(0,0,0,.4)" }}>{g.msg}</div>
       </div>
+
+      {/* rotating glossary tip — non-intrusive, fades, dismissible */}
+      {hintsOn && (
+        <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, background: T.card, border: `1.5px solid ${T.cardBorder}`, borderRadius: 12, padding: "8px 11px", boxShadow: T.chipShadow }}>
+          <span style={{ fontSize: 14 }}>💡</span>
+          <span key={tipI} className={tipShow ? "ss-tipfade" : ""} style={{ flex: 1, fontSize: 12.5, fontWeight: 600, color: T.sub, lineHeight: 1.35, opacity: tipShow ? 1 : 0, transition: "opacity .4s ease" }}>{SIM_TIPS[tipI]}</span>
+          <button onClick={toggleHints} aria-label="Dismiss tips" style={{ background: "none", border: "none", color: T.sub, fontSize: 15, cursor: "pointer", padding: 2, lineHeight: 1, opacity: .7 }}>✕</button>
+        </div>
+      )}
 
       {/* your melds */}
       {myMelds.length > 0 && (
@@ -3646,6 +3826,15 @@ export default function SparrowSchool() {
           .ss-bubbleout { animation: ssbubbleout .26s ease both; }
           @keyframes ssbubblein { 0% { opacity: 0; transform: translateY(6px) scale(.85); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
           @keyframes ssbubbleout { to { opacity: 0; transform: translateY(-4px) scale(.92); } }
+          @keyframes ssland { 0% { transform: scale(1.7) translateY(-10px); opacity: 0; } 60% { transform: scale(.9); opacity: 1; } 100% { transform: scale(1); } }
+          .ss-land2 { animation: ssland .32s cubic-bezier(.34,1.56,.64,1); }
+          @keyframes ssflash { 0% { opacity: 0; transform: scale(.5) rotate(-8deg); } 25% { opacity: 1; transform: scale(1.12) rotate(-3deg); } 70% { opacity: 1; transform: scale(1) rotate(-3deg); } 100% { opacity: 0; transform: scale(1.05) rotate(-3deg); } }
+          .ss-flash { animation: ssflash 1s ease-out forwards; }
+          @keyframes sspulsering { 0% { box-shadow: 0 0 0 0 var(--pc); } 70% { box-shadow: 0 0 0 8px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+          .ss-pulsering { animation: sspulsering 1.4s ease-out infinite; }
+          @keyframes ssthink { 0%,100% { transform: translateY(0); opacity:.4; } 50% { transform: translateY(-3px); opacity:1; } }
+          .ss-tipfade { animation: sstipfade .5s ease both; }
+          @keyframes sstipfade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
         `}</style>
 
         {booting ? (
