@@ -3047,26 +3047,34 @@ function TileBackRow({ n, horizontal }) {
   );
 }
 
-function Seat({ seatIdx, seat, count, active, say, thinking, side }) {
-  const T = useT();
+function Seat({ seatIdx, seat, active, thinking }) {
   const who = SEAT_WHO[seatIdx];
-  // bubble position depends on which edge the seat sits on
-  const bubblePos = side === "top" ? { top: "100%", marginTop: 6 }
-    : side === "left" ? { left: "100%", marginLeft: 6, top: 6 }
-    : side === "right" ? { right: "100%", marginRight: 6, top: 6 }
-    : { bottom: "100%", marginBottom: 6 };
   return (
     <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-      {say && (
-        <div className="ss-bubblein" style={{ position: "absolute", zIndex: 9, background: "#fff", color: "#2A2533", fontWeight: 700, fontSize: 11, padding: "6px 9px", borderRadius: 11, boxShadow: "0 5px 14px rgba(0,0,0,.28)", border: "1.5px solid #FFE08A", width: 132, textAlign: "center", lineHeight: 1.3, ...bubblePos }}>
-          {say}
-        </div>
-      )}
       <SeatBust who={who} size={50} active={active} />
       <div style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(0,0,0,.35)", padding: "1px 7px", borderRadius: 999 }}>
         <span style={{ fontFamily: "'Noto Sans TC',sans-serif", fontSize: 11, fontWeight: 800, color: active ? "#FFD54A" : "#CDEBD9" }}>{seat.wind}</span>
         <span style={{ fontSize: 10.5, fontWeight: 800, color: "#EAFBF1" }}>{seat.name}</span>
         {thinking && <span style={{ display: "inline-flex", gap: 2 }}>{[0, 1, 2].map((i) => <span key={i} style={{ width: 3.5, height: 3.5, borderRadius: "50%", background: "#FFD54A", animation: "ssthink 1s ease-in-out infinite", animationDelay: `${i * 0.15}s` }} />)}</span>}
+      </div>
+    </div>
+  );
+}
+
+// Speech bubbles live in the four empty CORNERS of the table, so they never
+// crowd the center discard pond. Each seat is mapped to its adjacent corner.
+const SEAT_CORNER = { 2: "tl", 1: "tr", 0: "br", 3: "bl" };
+function TableBubble({ corner, name, text }) {
+  const pos = {
+    tl: { top: 6, left: 6, alignItems: "flex-start", tail: { left: 14 } },
+    tr: { top: 6, right: 6, alignItems: "flex-end", tail: { right: 14 } },
+    bl: { bottom: 6, left: 6, alignItems: "flex-start", tail: { left: 14 } },
+    br: { bottom: 6, right: 6, alignItems: "flex-end", tail: { right: 14 } },
+  }[corner];
+  return (
+    <div style={{ position: "absolute", top: pos.top, bottom: pos.bottom, left: pos.left, right: pos.right, zIndex: 10, maxWidth: "44%", display: "flex", flexDirection: "column", alignItems: pos.alignItems, pointerEvents: "none" }}>
+      <div className="ss-bubblein" style={{ background: "#fff", color: "#2A2533", fontSize: 10.5, fontWeight: 700, lineHeight: 1.3, padding: "6px 9px", borderRadius: 11, boxShadow: "0 5px 14px rgba(0,0,0,.3)", border: "1.5px solid #FFE08A", textAlign: "left" }}>
+        <span style={{ color: "#C28800", fontWeight: 800, marginRight: 4 }}>{name}:</span>{text}
       </div>
     </div>
   );
@@ -3083,6 +3091,7 @@ function Sim({ teacher, onExit }) {
   const [flash, setFlash] = useState(null);                  // {text, color} big call banner
   const [tipI, setTipI] = useState(() => Math.floor(Math.random() * SIM_TIPS.length));
   const [tipShow, setTipShow] = useState(true);
+  const [showTerms, setShowTerms] = useState(false);
   const timer = useRef(null);
   const bubbleTimers = useRef({});
   const convoTimer = useRef(null);
@@ -3280,10 +3289,35 @@ function Sim({ teacher, onExit }) {
         <button onClick={onExit} aria-label="Exit game" style={{ background: T.card, border: `1.5px solid ${T.cardBorder}`, borderRadius: 12, width: 40, height: 40, fontSize: 16, color: T.sub, cursor: "pointer", boxShadow: T.chipShadow }}>✕</button>
         <div style={{ flex: 1, fontFamily: T.fontDisplay, fontWeight: 800, fontSize: 15.5, color: T.ink }}>Practice Table <span style={{ color: T.sub, fontWeight: 700, fontSize: 12.5 }}>· wall {g.wallLeft ?? g.wall.length}</span></div>
         <button onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"} style={{ background: T.card, border: `1.5px solid ${T.cardBorder}`, borderRadius: 999, width: 38, height: 38, fontSize: 16, color: T.sub, cursor: "pointer", boxShadow: T.chipShadow }}>{muted ? "🔇" : "🔊"}</button>
+        <button onClick={() => setShowTerms((v) => !v)} aria-label="Glossary" style={{ background: showTerms ? T.primary : T.card, color: showTerms ? "#fff" : T.sub, border: `1.5px solid ${showTerms ? T.primary : T.cardBorder}`, borderRadius: 999, width: 38, height: 38, fontSize: 15, cursor: "pointer", boxShadow: T.chipShadow }}>📖</button>
         <button onClick={() => setTips((v) => !v)} style={{ background: tips ? T.primary : T.card, color: tips ? "#fff" : T.sub, border: `1.5px solid ${tips ? T.primary : T.cardBorder}`, borderRadius: 999, padding: "7px 12px", fontWeight: 800, fontSize: 12, cursor: "pointer", boxShadow: T.chipShadow }}>Hints {tips ? "on" : "off"}</button>
       </div>
 
-      {/* table — arcade cabinet screen */}
+      {/* tappable glossary of the key calls/terms */}
+      {showTerms && (
+        <div className="ss-tipfade" style={{ marginBottom: 8, background: T.card, border: `1.5px solid ${T.cardBorder}`, borderRadius: 14, padding: "12px 14px", boxShadow: T.cardShadow }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <span style={{ fontWeight: 800, fontSize: 14, color: T.ink, fontFamily: T.fontDisplay }}>📖 Quick glossary</span>
+            <button onClick={() => setShowTerms(false)} style={{ background: "none", border: "none", color: T.sub, fontSize: 16, cursor: "pointer" }}>✕</button>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {[
+              ["碰", "Pung", "three identical tiles — claim from anyone"],
+              ["上", "Chow", "a run of three in one suit — only from your left"],
+              ["食糊", "Sik wu", "the win: four sets + a pair"],
+              ["自摸", "Zi mo", "self-draw — you drew your own winning tile (pays more)"],
+              ["番", "Fan", "points — most tables need 3 to win"],
+              ["眼", "Ngaan", "the “eyes” — your one pair"],
+              ["出銃", "Cheut zung", "you discard the tile someone wins on — you alone pay"],
+            ].map(([cn, rom, def]) => (
+              <div key={rom} style={{ display: "flex", gap: 9, alignItems: "baseline" }}>
+                <span style={{ fontFamily: "'Noto Sans TC',sans-serif", fontWeight: 800, fontSize: 16, color: T.primary, minWidth: 38 }}>{cn}</span>
+                <span style={{ fontSize: 13, color: T.ink }}><b>{rom}</b> — {def}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div style={{ flex: 1, position: "relative", borderRadius: 22, padding: 4, background: "linear-gradient(135deg, #FF4D8D, #C9920F 40%, #34D0FF)", boxShadow: `0 0 22px ${T.neonPink}55, 0 6px 0 rgba(0,0,0,.25)` }}>
       <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1", maxWidth: 440, margin: "0 auto", background: "radial-gradient(120% 120% at 50% 45%, #1F7A55 0%, #16603F 60%, #0E4329 100%)", borderRadius: 18, boxShadow: "inset 0 2px 18px rgba(0,0,0,.45)", overflow: "hidden" }}>
         {/* CRT scanlines */}
@@ -3293,24 +3327,34 @@ function Sim({ teacher, onExit }) {
 
         {/* seats on the four edges */}
         <div style={{ position: "absolute", top: 8, left: "50%", transform: "translateX(-50%)" }}>
-          <Seat seatIdx={2} seat={SEAT_INFO[2]} count={g.hands[2].length} active={g.cur === 2} say={bubbles[2]} thinking={g.cur === 2 && g.phase === "botthinking"} side="top" />
+          <Seat seatIdx={2} seat={SEAT_INFO[2]} active={g.cur === 2} thinking={g.cur === 2 && g.phase === "botthinking"} />
         </div>
         <div style={{ position: "absolute", left: 6, top: "50%", transform: "translateY(-50%)" }}>
-          <Seat seatIdx={3} seat={SEAT_INFO[3]} count={g.hands[3].length} active={g.cur === 3} say={bubbles[3]} thinking={g.cur === 3 && g.phase === "botthinking"} side="left" />
+          <Seat seatIdx={3} seat={SEAT_INFO[3]} active={g.cur === 3} thinking={g.cur === 3 && g.phase === "botthinking"} />
         </div>
         <div style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)" }}>
-          <Seat seatIdx={1} seat={SEAT_INFO[1]} count={g.hands[1].length} active={g.cur === 1} say={bubbles[1]} thinking={g.cur === 1 && g.phase === "botthinking"} side="right" />
+          <Seat seatIdx={1} seat={SEAT_INFO[1]} active={g.cur === 1} thinking={g.cur === 1 && g.phase === "botthinking"} />
         </div>
         <div style={{ position: "absolute", bottom: 6, left: "50%", transform: "translateX(-50%)" }}>
-          <Seat seatIdx={0} seat={SEAT_INFO[0]} count={g.hands[0].length} active={g.cur === 0} say={bubbles[0]} thinking={false} side="bottom" />
+          <Seat seatIdx={0} seat={SEAT_INFO[0]} active={g.cur === 0} thinking={false} />
         </div>
 
-        {/* center: discard pond */}
-        <div style={{ position: "absolute", inset: "26%", display: "flex", flexWrap: "wrap", alignContent: "center", justifyContent: "center", gap: 2 }}>
-          {g.pond.slice(-16).map((d, i, arr) => (
-            <div key={g.pond.length - arr.length + i} className={i === arr.length - 1 ? "ss-land2" : ""} style={{ transform: "scale(.7)", margin: -3 }}><MiniTile t={simFromKey(d.t)} size={30} /></div>
-          ))}
+        {/* center: discard pond — bigger, readable tiles; newest is highlighted */}
+        <div style={{ position: "absolute", inset: "27%", display: "flex", flexWrap: "wrap", alignContent: "center", justifyContent: "center", gap: 3 }}>
+          {g.pond.slice(-12).map((d, i, arr) => {
+            const newest = i === arr.length - 1;
+            return (
+              <div key={g.pond.length - arr.length + i} className={newest ? "ss-land2" : ""} style={{ borderRadius: 7, boxShadow: newest ? `0 0 0 2.5px ${T.star}, 0 0 9px ${T.star}99` : "none" }}>
+                <MiniTile t={simFromKey(d.t)} size={38} />
+              </div>
+            );
+          })}
         </div>
+
+        {/* chatter bubbles — one per corner, never over the pond */}
+        {Object.keys(bubbles).map((s) => bubbles[s] && (
+          <TableBubble key={s} corner={SEAT_CORNER[s]} name={SEAT_INFO[s].name} text={bubbles[s]} />
+        ))}
 
         {/* big call flash */}
         {flash && (
@@ -3392,11 +3436,19 @@ function Sim({ teacher, onExit }) {
 
       {/* action bar */}
       {g.phase === "claim" && g.offer && (
-        <div className="ss-sheet" style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          {g.offer.win && <button onClick={() => setG(youWin(g, false, g.offer.from))} className="ss-btn" style={{ flex: 1, minHeight: 52, fontWeight: 800, fontSize: 16, color: "#fff", background: T.star, border: "none", borderRadius: 14, boxShadow: `0 4px 0 #C99200`, cursor: "pointer", fontFamily: T.fontBody }}>食糊!</button>}
-          {g.offer.pung && <button onClick={doPung} className="ss-btn" style={{ flex: 1, minHeight: 52, fontWeight: 800, fontSize: 16, color: "#fff", background: T.primary, border: "none", borderRadius: 14, boxShadow: `0 4px 0 ${T.primaryDeep}`, cursor: "pointer", fontFamily: T.fontBody }}>碰 Pung</button>}
-          {g.offer.chow && <button onClick={doChow} className="ss-btn" style={{ flex: 1, minHeight: 52, fontWeight: 800, fontSize: 16, color: T.ink, background: T.card, border: `1.5px solid ${T.cardBorder}`, borderRadius: 14, boxShadow: T.cardShadow, cursor: "pointer", fontFamily: T.fontBody }}>上 Chow</button>}
-          <button onClick={pass} style={{ flex: 1, minHeight: 52, fontWeight: 800, fontSize: 16, color: T.sub, background: T.card, border: `1.5px solid ${T.cardBorder}`, borderRadius: 14, boxShadow: T.cardShadow, cursor: "pointer", fontFamily: T.fontBody }}>Pass</button>
+        <div className="ss-sheet" style={{ marginTop: 12 }}>
+          {/* Chinese-term reminders — only the calls you can actually make right now */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", marginBottom: 8 }}>
+            {g.offer.win && <span style={{ fontSize: 11, fontWeight: 700, color: T.sub, background: T.card, border: `1px solid ${T.cardBorder}`, borderRadius: 999, padding: "3px 10px" }}>食糊 <span style={{ color: T.ink }}>sik wu</span> = win (4 sets + a pair)</span>}
+            {g.offer.pung && <span style={{ fontSize: 11, fontWeight: 700, color: T.sub, background: T.card, border: `1px solid ${T.cardBorder}`, borderRadius: 999, padding: "3px 10px" }}>碰 <span style={{ color: T.ink }}>pung</span> = your 2 + their tile (3 identical)</span>}
+            {g.offer.chow && <span style={{ fontSize: 11, fontWeight: 700, color: T.sub, background: T.card, border: `1px solid ${T.cardBorder}`, borderRadius: 999, padding: "3px 10px" }}>上 <span style={{ color: T.ink }}>chow</span> = a run of 3, same suit</span>}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {g.offer.win && <button onClick={() => setG(youWin(g, false, g.offer.from))} className="ss-btn" style={{ flex: 1, minHeight: 52, fontWeight: 800, fontSize: 16, color: "#fff", background: T.star, border: "none", borderRadius: 14, boxShadow: `0 4px 0 #C99200`, cursor: "pointer", fontFamily: T.fontBody }}>食糊!</button>}
+            {g.offer.pung && <button onClick={doPung} className="ss-btn" style={{ flex: 1, minHeight: 52, fontWeight: 800, fontSize: 16, color: "#fff", background: T.primary, border: "none", borderRadius: 14, boxShadow: `0 4px 0 ${T.primaryDeep}`, cursor: "pointer", fontFamily: T.fontBody }}>碰 Pung</button>}
+            {g.offer.chow && <button onClick={doChow} className="ss-btn" style={{ flex: 1, minHeight: 52, fontWeight: 800, fontSize: 16, color: T.ink, background: T.card, border: `1.5px solid ${T.cardBorder}`, borderRadius: 14, boxShadow: T.cardShadow, cursor: "pointer", fontFamily: T.fontBody }}>上 Chow</button>}
+            <button onClick={pass} style={{ flex: 1, minHeight: 52, fontWeight: 800, fontSize: 16, color: T.sub, background: T.card, border: `1.5px solid ${T.cardBorder}`, borderRadius: 14, boxShadow: T.cardShadow, cursor: "pointer", fontFamily: T.fontBody }}>Pass</button>
+          </div>
         </div>
       )}
       {g.phase === "myturn" && g.offer?.win && (
